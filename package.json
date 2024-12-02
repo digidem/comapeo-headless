@@ -1,0 +1,27 @@
+{
+  "private": true,
+  "scripts": {
+    "format": "prettier --write .",
+    "test:prettier": "prettier --check .",
+    "test:eslint": "eslint --cache .",
+    "test:typescript": "tsc",
+    "test:node": "node --test",
+    "test": "npm-run-all --aggregate-output --print-label --parallel test:*",
+    "watch:test:typescript": "tsc --watch",
+    "watch:test:node": "npm run test:node -- --watch"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "@types/node": "^22.10.1",
+    "eslint": "^9.16.0",
+    "globals": "^15.13.0",
+    "npm-run-all2": "^7.0.1",
+    "prettier": "^3.4.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.17.0"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true
+  }
+}
