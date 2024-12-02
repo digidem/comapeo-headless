@@ -6,17 +6,19 @@ import { isIPv4 } from 'node:net'
 const BONJOUR_SERVICE_TYPE = 'comapeo'
 
 /**
- * @param {MapeoManager} mapeoManager
- * @param {(fn: () => unknown) => unknown} onCleanup
+ * @param {object} options
+ * @param {MapeoManager} options.mapeoManager
+ * @param {(fn: () => unknown) => unknown} options.onCleanup
+ * @param {(message: string) => unknown} options.debug
  * @returns {Promise<void>}
  */
-export async function startLocalDiscovery(mapeoManager, onCleanup) {
+export async function startLocalDiscovery({ mapeoManager, onCleanup, debug }) {
   const { name, port } = await mapeoManager.startLocalPeerDiscoveryServer()
   onCleanup(() => {
-    console.log('Stopping local peer discovery server...')
+    debug('Stopping local peer discovery server...')
     return mapeoManager.stopLocalPeerDiscoveryServer()
   })
-  console.log(
+  debug(
     `Started local peer discovery server on port ${port} with name ${name}.`,
   )
 
@@ -28,31 +30,31 @@ export async function startLocalDiscovery(mapeoManager, onCleanup) {
     port,
   })
   onCleanup(() => {
-    console.log('Stopping Bonjour service...')
+    debug('Stopping Bonjour service...')
     return publishedService.stop?.()
   })
-  console.log(`Published Bonjour service with name ${name}.`)
+  debug(`Published Bonjour service with name ${name}.`)
 
   const browser = bonjour.find({ type: BONJOUR_SERVICE_TYPE }, (service) => {
     if (service.name === name) return
-    console.log(
+    debug(
       `Found peer named ${JSON.stringify(service.name)} on port ${service.port} with address(es) ${JSON.stringify(service.addresses)}.`,
     )
     const peer = bonjourServiceToMapeoPeer(service)
     if (peer) {
       mapeoManager.connectLocalPeer(peer)
-      console.log(`Connected peer ${JSON.stringify(service.name)}.`)
+      debug(`Connected peer ${JSON.stringify(service.name)}.`)
     } else {
-      console.log(
+      debug(
         `Peer ${JSON.stringify(service.name)} could not be converted to a Mapeo peer; ignoring.`,
       )
     }
   })
   onCleanup(() => {
-    console.log('Stopping Bonjour browser...')
+    debug('Stopping Bonjour browser...')
     return browser.stop()
   })
-  console.log('Started Bonjour browser.')
+  debug('Started Bonjour browser.')
 }
 
 /**

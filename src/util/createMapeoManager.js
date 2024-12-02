@@ -7,11 +7,12 @@ import { getErrorCode } from '../lib/getErrorCode.js'
 
 /**
  * @param {object} options
- * @param {string} options.name
+ * @param {string} [options.name]
  * @param {string} options.dataPath
+ * @param {(message: string) => unknown} options.debug
  * @returns {Promise<MapeoManager>}
  */
-export async function createMapeoManager({ name, dataPath }) {
+export async function createMapeoManager({ name, dataPath, debug }) {
   const migrationsDir = new URL(
     '../../node_modules/@comapeo/core/drizzle',
     import.meta.url,
@@ -32,9 +33,9 @@ export async function createMapeoManager({ name, dataPath }) {
     fastify: Fastify(),
   })
 
-  await result.setDeviceInfo({ name, deviceType: 'desktop' })
+  if (name) await setDeviceInfo(result, name)
 
-  console.log(`Created manager with device ID ${result.deviceId}.`)
+  debug(`Created manager with device ID ${result.deviceId}.`)
 
   return result
 }
@@ -65,4 +66,15 @@ async function getRootKey(dataPath) {
  */
 const mkdirp = async (path) => {
   await fs.mkdir(path, { recursive: true, mode: 0o700 })
+}
+
+/**
+ * @param {MapeoManager}mapeoManager
+ * @param {string} name
+ * @returns {Promise<void>}
+ */
+async function setDeviceInfo(mapeoManager, name) {
+  const existingDeviceInfo = mapeoManager.getDeviceInfo()
+  if (existingDeviceInfo.name === name) return
+  await mapeoManager.setDeviceInfo({ name, deviceType: 'desktop' })
 }

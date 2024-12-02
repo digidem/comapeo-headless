@@ -6,23 +6,25 @@
  */
 
 /**
- * @param {MapeoManager} mapeoManager
- * @param {(fn: () => unknown) => unknown} onCleanup
+ * @param {object} options
+ * @param {MapeoManager} options.mapeoManager
+ * @param {(fn: () => unknown) => unknown} options.onCleanup
+ * @param {(message: string) => unknown} options.debug
  * @returns {void}
  */
-export function autoAcceptAllInvites(mapeoManager, onCleanup) {
+export function autoAcceptAllInvites({ mapeoManager, onCleanup, debug }) {
   /**
    * @param {Invite} invite
    * @returns {Promise<void>}
    */
   const onInviteReceived = async (invite) => {
-    console.log(
+    debug(
       `Received invite ${invite.inviteId} for project ${JSON.stringify(invite.projectName)}.`,
     )
     const projectId = await mapeoManager.invite.accept(invite)
     const project = await mapeoManager.getProject(projectId)
     project.$sync.start()
-    console.log(
+    debug(
       `Accepted invite ${invite.inviteId} for project ${JSON.stringify(invite.projectName)}.`,
     )
   }
@@ -32,5 +34,5 @@ export function autoAcceptAllInvites(mapeoManager, onCleanup) {
     mapeoManager.invite.off('invite-received', onInviteReceived)
   })
 
-  console.log('Auto-accepting all invites.')
+  debug('Auto-accepting all invites.')
 }
