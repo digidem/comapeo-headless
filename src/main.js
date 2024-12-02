@@ -17,7 +17,9 @@ function main() {
 
   program
     .command('start')
-    .description('Start the instance')
+    .description(
+      'Start the instance. Automatically accepts invites and starts sync for all projects.',
+    )
     .option('-n, --name <name>', 'Instance name', 'CoMapeo CLI')
     .action(async ({ name }) => {
       const mapeoManager = await createMapeoManager({

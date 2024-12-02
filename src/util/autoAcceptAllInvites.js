@@ -13,10 +13,18 @@
 export function autoAcceptAllInvites(mapeoManager, onCleanup) {
   /**
    * @param {Invite} invite
-   * @returns {void}
+   * @returns {Promise<void>}
    */
-  const onInviteReceived = (invite) => {
-    mapeoManager.invite.accept(invite)
+  const onInviteReceived = async (invite) => {
+    console.log(
+      `Received invite ${invite.inviteId} for project ${JSON.stringify(invite.projectName)}.`,
+    )
+    const projectId = await mapeoManager.invite.accept(invite)
+    const project = await mapeoManager.getProject(projectId)
+    project.$sync.start()
+    console.log(
+      `Accepted invite ${invite.inviteId} for project ${JSON.stringify(invite.projectName)}.`,
+    )
   }
 
   mapeoManager.invite.on('invite-received', onInviteReceived)
