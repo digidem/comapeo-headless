@@ -48,6 +48,32 @@ function main() {
       }
     })
 
+  program
+    .command('import-legacy-mapeo-data')
+    .description('Import legacy Mapeo data.')
+    // TODO
+    // .requiredOption(
+    //   '-m, --mlef-path <mlefPath>',
+    //   'Path of .mlef file to import',
+    // )
+    .requiredOption('-p, --project-id <projectId>', 'Project ID to import to')
+    .action(async ({ projectId }) => {
+      const debug = console.log.bind(console)
+      const mapeoManager = await createMapeoManager({
+        dataPath: paths.data,
+        debug,
+      })
+      const project = await mapeoManager.getProject(projectId)
+      // TODO: Actually read legacy data
+      await project.observation.create({
+        schemaName: 'observation',
+        lat: 42,
+        lon: -87,
+        attachments: [],
+        tags: {},
+      })
+    })
+
   program.parse()
 }
 
