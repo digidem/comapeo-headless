@@ -2,20 +2,9 @@ import * as mlef from '@mapeo/legacy-export-format'
 import pProps from 'p-props'
 import * as v from 'valibot'
 import { temporaryWrite } from 'tempy'
-import * as util from 'node:util'
 /** @import { MapeoManager } from '@comapeo/core' */
 /** @import { MapeoProject } from '@comapeo/core/dist/mapeo-project.js' */
 /** @import { ObservationValue } from '@comapeo/schema' */
-
-// TODO
-util.inspect.defaultOptions.depth = Infinity
-
-// TODO
-// const ATTACHMENT_VARIANTS = /** @type {const} */ ([
-//   'original',
-//   'preview',
-//   'thumbnail',
-// ])
 
 /**
  * @internal
