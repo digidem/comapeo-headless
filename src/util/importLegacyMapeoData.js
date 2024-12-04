@@ -2,15 +2,20 @@ import * as mlef from '@mapeo/legacy-export-format'
 import pProps from 'p-props'
 import * as v from 'valibot'
 import { temporaryWrite } from 'tempy'
+import * as util from 'node:util'
 /** @import { MapeoManager } from '@comapeo/core' */
 /** @import { MapeoProject } from '@comapeo/core/dist/mapeo-project.js' */
 /** @import { ObservationValue } from '@comapeo/schema' */
 
-const ATTACHMENT_VARIANTS = /** @type {const} */ ([
-  'original',
-  'preview',
-  'thumbnail',
-])
+// TODO
+util.inspect.defaultOptions.depth = Infinity
+
+// TODO
+// const ATTACHMENT_VARIANTS = /** @type {const} */ ([
+//   'original',
+//   'preview',
+//   'thumbnail',
+// ])
 
 /**
  * @internal
@@ -52,6 +57,7 @@ const OldTagsSchema = v.record(
 )
 
 // Lifted from <https://github.com/digidem/mapeo-mobile/blob/0c0ebbb9ef2261e21cd1d1c8bd5ab2fe42017ea3/src/frontend/%40types/mapeo-schema.d.ts#L41-L70>.
+// TODO: Remove keys we dont use
 const OldDocumentSchema = v.object({
   attachments: v.optional(
     v.array(
@@ -96,16 +102,24 @@ const OldDocumentSchema = v.object({
   timestamp: v.optional(v.string()),
   type: v.literal('observation'),
   userId: v.optional(v.string()),
-  version: v.string(),
+  // TODO
+  // version: v.string(),
 })
 
 /**
- * @param {unknown} oldDocument
- * @returns {null | { attachments: OldAttachment[], value: ObservationValue }}
+ * @param {Awaited<ReturnType<typeof mlef.reader>>} reader
+ * @param {unknown} rawOldDocument
+ * @returns {Promise<null | { attachments: OldAttachment[], value: ObservationValue }>}
  */
-function parseOldObservation(oldDocument) {
-  if (!v.is(OldDocumentSchema, oldDocument)) return null
+async function parseOldObservation(reader, rawOldDocument) {
+  const parsed = v.safeParse(OldDocumentSchema, rawOldDocument)
+  if (!parsed.success) {
+    console.log(parsed.issues)
+    return null
+  }
+  const oldDocument = parsed.output
 
+  // TODO: add more values
   /** @type {ObservationValue} */
   const value = {
     schemaName: 'observation',
@@ -113,10 +127,18 @@ function parseOldObservation(oldDocument) {
     tags: oldDocument.tags || {},
   }
 
-  return {
-    attachments: [],
-    value,
-  }
+  const attachments = await Promise.all(
+    (oldDocument.attachments || []).map(async (attachment) => {
+      /** @type {OldAttachment} */
+      const result = { type: attachment.type || 'image/jpeg', variants: {} }
+      for await (const media of reader.getMediaById(attachment.id)) {
+        result.variants[media.variant] = media.data
+      }
+      return result
+    }),
+  )
+
+  return { attachments, value }
 }
 
 /**
@@ -194,7 +216,10 @@ export async function importLegacyMapeoData({
       continue
     }
 
-    const parsedOldObservation = parseOldObservation(firstVersion.document)
+    const parsedOldObservation = await parseOldObservation(
+      reader,
+      firstVersion.document,
+    )
     if (!parsedOldObservation) {
       debug(`Skipping import of ${document.id} because we couldn't parse it.`)
       continue
