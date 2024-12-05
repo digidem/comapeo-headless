@@ -97,10 +97,12 @@ const OldDocumentSchema = v.object({
 
 /**
  * @param {Awaited<ReturnType<typeof mlef.reader>>} reader
- * @param {unknown} rawOldDocument
+ * @param {TODO} rawOldDocument
  * @returns {Promise<null | { attachments: OldAttachment[], value: ObservationValue }>}
  */
 async function parseOldObservation(reader, rawOldDocument) {
+  // TODO: attach hypercore metadata to metadata
+
   const parsed = v.safeParse(OldDocumentSchema, rawOldDocument)
   if (!parsed.success) {
     console.log(parsed.issues)
@@ -205,10 +207,7 @@ export async function importLegacyMapeoData({
       continue
     }
 
-    const parsedOldObservation = await parseOldObservation(
-      reader,
-      firstVersion.document,
-    )
+    const parsedOldObservation = await parseOldObservation(reader, firstVersion)
     if (!parsedOldObservation) {
       debug(`Skipping import of ${document.id} because we couldn't parse it.`)
       continue
@@ -227,6 +226,8 @@ export async function importLegacyMapeoData({
       ...value,
       attachments: newAttachments,
     })
-    debug(`Imported ${document.id} into new observation at ${observation.docId}.`)
+    debug(
+      `Imported ${document.id} into new observation at ${observation.docId}.`,
+    )
   }
 }
