@@ -69,14 +69,6 @@ function main() {
         mlefPath,
         debug,
       })
-      // TODO: Remove this
-      // await project.observation.create({
-      //   schemaName: 'observation',
-      //   lat: 42,
-      //   lon: -87,
-      //   attachments: [],
-      //   tags: {},
-      // })
     })
 
   program.parse()
