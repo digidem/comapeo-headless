@@ -5,6 +5,7 @@ import { createMapeoManager } from './util/createMapeoManager.js'
 import { enableSyncForAllProjects } from './util/enableSyncForAllProjects.js'
 import { autoAcceptAllInvites } from './util/autoAcceptAllInvites.js'
 import { startLocalDiscovery } from './util/startLocalDiscovery.js'
+import { importLegacyMapeoData } from './util/importLegacyMapeoData.js'
 import { noop } from './lib/noop.js'
 
 const APP_NAME = 'comapeo-headless'
@@ -51,26 +52,22 @@ function main() {
   program
     .command('import-legacy-mapeo-data')
     .description('Import legacy Mapeo data.')
-    // TODO
-    // .requiredOption(
-    //   '-m, --mlef-path <mlefPath>',
-    //   'Path of .mlef file to import',
-    // )
+    .requiredOption(
+      '-m, --mlef-path <mlefPath>',
+      'Path of .mlef file to import',
+    )
     .requiredOption('-p, --project-id <projectId>', 'Project ID to import to')
-    .action(async ({ projectId }) => {
+    .action(async ({ mlefPath, projectId }) => {
       const debug = console.log.bind(console)
       const mapeoManager = await createMapeoManager({
         dataPath: paths.data,
         debug,
       })
-      const project = await mapeoManager.getProject(projectId)
-      // TODO: Actually read legacy data
-      await project.observation.create({
-        schemaName: 'observation',
-        lat: 42,
-        lon: -87,
-        attachments: [],
-        tags: {},
+      await importLegacyMapeoData({
+        mapeoManager,
+        projectId,
+        mlefPath,
+        debug,
       })
     })
 
