@@ -6,6 +6,7 @@
     "comapeo-headless": "./src/main.js"
   },
   "scripts": {
+    "start": "node src/main.js",
     "format": "prettier --write .",
     "test:prettier": "prettier --check .",
     "test:eslint": "eslint --cache .",
