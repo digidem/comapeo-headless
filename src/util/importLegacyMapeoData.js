@@ -7,6 +7,16 @@ import { removeNilValues } from '../lib/removeNilValues.js'
 /** @import { MapeoManager } from '@comapeo/core' */
 /** @import { MapeoProject } from '@comapeo/core/dist/mapeo-project.js' */
 /** @import { Observation, ObservationValue } from '@comapeo/schema' */
+/** @import { Document } from '@mapeo/legacy-export-format' */
+
+/**
+ * @internal
+ * @typedef {object} ParsedOldObservation
+ * @prop {string} version
+ * @prop {string[]} links
+ * @prop {ObservationValue} value
+ * @prop {OldAttachment[]} attachments
+ */
 
 /**
  * @internal
@@ -60,6 +70,7 @@ const OldDocumentSchema = v.object({
     ),
   ),
   lat: v.nullish(v.number()),
+  links: v.nullish(v.array(v.string())),
   lon: v.nullish(v.number()),
   metadata: v.optional(
     v.object({
@@ -79,11 +90,14 @@ const OldDocumentSchema = v.object({
 
 /**
  * @param {Awaited<ReturnType<typeof mlef.reader>>} reader
+ * @param {string} version
  * @param {unknown} oldDocument
- * @returns {Promise<null | { attachments: OldAttachment[], value: ObservationValue }>}
+ * @returns {Promise<null | ParsedOldObservation>}
  */
-async function parseOldObservation(reader, oldDocument) {
+async function parseOldObservation(reader, version, oldDocument) {
   if (!v.is(OldDocumentSchema, oldDocument)) return null
+
+  const links = oldDocument.links || []
 
   const oldMetadataLocation = oldDocument.metadata?.location
   const oldMetadataPosition = oldMetadataLocation?.position
@@ -127,7 +141,7 @@ async function parseOldObservation(reader, oldDocument) {
     }),
   )
 
-  return { attachments, value }
+  return { version, links, value, attachments }
 }
 
 /**
@@ -181,45 +195,61 @@ async function createAttachment({ project, oldAttachment }) {
 
 /**
  * @param {object} options
- * @param {MapeoManager} options.mapeoManager
- * @param {string} options.projectId
- * @param {string} options.mlefPath
+ * @param {MapeoProject} options.project
+ * @param {Awaited<ReturnType<typeof mlef.reader>>} options.reader
+ * @param {Document} options.document
  * @param {(message: string) => unknown} options.debug
  * @returns {Promise<void>}
  */
-export async function importLegacyMapeoData({
-  mapeoManager,
-  projectId,
-  mlefPath,
-  debug,
-}) {
-  const project = await mapeoManager.getProject(projectId)
-  debug(`Loaded project ${projectId}.`)
-
-  const reader = await mlef.reader(mlefPath)
-  debug(`Started reading ${mlefPath}.`)
-
+async function importObservation({ project, reader, document, debug }) {
   /** @type {Map<string, ObservationValue['attachments'][0]>} */
   const attachmentsCreated = new Map()
 
-  for await (const document of reader.documents()) {
-    /** @type {undefined | string} */
-    let previousVersionId
+  /** @type {Map<string, string>} */
+  const oldVersionToNewVersion = new Map()
 
-    for (const documentVersion of document.versions) {
+  /**
+   * @param {string[]} oldLinks
+   * @returns {null | string[]}
+   */
+  const getNewVersions = (oldLinks) => {
+    /** @type {string[]} */ const result = []
+    for (const oldLink of oldLinks) {
+      const newLink = oldVersionToNewVersion.get(oldLink)
+      if (!newLink) return null
+      result.push(newLink)
+    }
+    return result
+  }
+
+  /** @type {ParsedOldObservation[]} */
+  let remainingVersions = []
+  await Promise.all(
+    document.versions.map(async (documentVersion) => {
       const parsedOldObservation = await parseOldObservation(
         reader,
+        documentVersion.version,
         documentVersion.document,
       )
-
-      if (!parsedOldObservation) {
+      if (parsedOldObservation) {
+        remainingVersions.push(parsedOldObservation)
+      } else {
         debug(
           `Skipping import of ${document.id} version ${documentVersion.version} because we couldn't parse it.`,
         )
-        continue
       }
+    }),
+  )
 
-      const { attachments, value } = parsedOldObservation
+  while (remainingVersions.length) {
+    /** @type {Set<string>} */
+    const oldVersionsMigrated = new Set()
+
+    for (const oldVersion of remainingVersions) {
+      const { version, links, value, attachments } = oldVersion
+
+      const linksToUpdate = getNewVersions(links)
+      if (!linksToUpdate) continue
 
       /** @type {ObservationValue['attachments']} */
       const newAttachments = []
@@ -243,13 +273,13 @@ export async function importLegacyMapeoData({
 
       /** @type {Observation} */
       let observation
-      if (previousVersionId) {
+      if (linksToUpdate.length) {
         observation = await project.observation.update(
-          previousVersionId,
+          linksToUpdate,
           toCreateOrUpdate,
         )
         debug(
-          `Updated ${observation.docId} by importing legacy version ${documentVersion.version}.`,
+          `Updated ${observation.docId} by importing legacy version ${version}.`,
         )
       } else {
         observation = await project.observation.create(toCreateOrUpdate)
@@ -258,7 +288,40 @@ export async function importLegacyMapeoData({
         )
       }
 
-      previousVersionId = observation.versionId
+      oldVersionToNewVersion.set(version, observation.versionId)
+      oldVersionsMigrated.add(version)
     }
+
+    if (!oldVersionsMigrated.size) {
+      throw new Error('No versions migrated. Do documents have proper links?')
+    }
+    remainingVersions = remainingVersions.filter(
+      (version) => !oldVersionsMigrated.has(version.version),
+    )
+  }
+}
+
+/**
+ * @param {object} options
+ * @param {MapeoManager} options.mapeoManager
+ * @param {string} options.projectId
+ * @param {string} options.mlefPath
+ * @param {(message: string) => unknown} options.debug
+ * @returns {Promise<void>}
+ */
+export async function importLegacyMapeoData({
+  mapeoManager,
+  projectId,
+  mlefPath,
+  debug,
+}) {
+  const project = await mapeoManager.getProject(projectId)
+  debug(`Loaded project ${projectId}.`)
+
+  const reader = await mlef.reader(mlefPath)
+  debug(`Started reading ${mlefPath}.`)
+
+  for await (const document of reader.documents()) {
+    await importObservation({ project, reader, document, debug })
   }
 }
